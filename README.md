@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Abraham to Jesus
 
-## Getting Started
+An interactive lineage from Abraham through the twelve tribes, the Davidic kings, the exile, and the post-exilic line to Jesus of Nazareth. Click a name to expand its descendants and read context on the figure: era, role, key events, and biblical references.
 
-First, run the development server:
+The tree intentionally surfaces both the **legal line through Joseph** (Matthew 1) and the **biological line through Mary** (Luke 3) where they diverge, and renders matriarchs as marriage links rather than descent links so the covenant family reads correctly.
+
+## Stack
+
+- Next.js 16 (App Router) · React 19 · TypeScript (strict)
+- Tailwind v4 (PostCSS) — minimal usage; most styling is inline with a shared token palette
+- D3 v7 — used only for `d3.zoom` (pan/zoom behavior). Layout is a custom recursive algorithm.
+- lucide-react — toolbar icons
+
+## Run it
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build   # production build
+npm run start   # serve the production build
+npm run lint    # eslint
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Requires Node.js compatible with Next.js 16 (Node 20+).
 
-## Learn More
+## Using the visualization
 
-To learn more about Next.js, take a look at the following resources:
+- **Click** any node to expand its children and open the detail panel.
+- **Scroll** to zoom, **drag** to pan.
+- **Expand all** opens every branch; **Reset** collapses back to Abraham; the **fit-to-screen** button frames the currently expanded tree.
+- Pivot figures (Abraham, Isaac, Jacob, Judah, David, Jesus, …) are drawn with a heavier border. Mothers appear as rounded pills connected via marriage links.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Editing the genealogy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+All data lives inline in `components/Genealogy.tsx` as a single `PersonNode` tree built with the `N(id, name, type, info, children)` helper. To add a person, edit that tree — there is no external data file or database. Each node carries `era`, `date`, `role`, `summary`, `significance`, `events`, and `refs` (biblical citations).
 
-## Deploy on Vercel
+## Architecture
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+See [`CLAUDE.md`](./CLAUDE.md) for the file-by-file walkthrough, layout algorithm, design tokens, and conventions (pivot flag, mother-as-marriage rendering, the D3-zoom-only pattern).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Sources
+
+The narrative summaries draw on the Hebrew Bible (Genesis, Ruth, 1–2 Samuel, 1–2 Kings, 1–2 Chronicles, Ezra, Nehemiah), the Gospels (Matthew 1, Luke 3), and the Pauline reflection on Abraham (Romans 4, Galatians 3–4, Hebrews 11).
