@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -8,6 +8,15 @@ export const metadata: Metadata = {
   title: "Abraham to Jesus — the messianic genealogy",
   description:
     "An interactive lineage from Abraham through the twelve tribes, the Davidic kings, the exile, and the post-exilic line to Jesus of Nazareth. Click any name for context.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#0f0d0a",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
