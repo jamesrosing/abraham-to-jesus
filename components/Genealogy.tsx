@@ -157,10 +157,10 @@ const data: PersonNode = W(
         W(
           N("jacob", "Jacob", "patriarch", {
             pivot: true, era: "Patriarchal Age", date: "c. 1850 BC", role: "Father of the Twelve Tribes; renamed Israel",
-            summary: "Younger twin who supplanted Esau, wrestled with God at Peniel, and was renamed Israel. His twelve sons by four women became the twelve tribes.",
-            significance: "The nation Israel is named for him. The tribal structure and territorial allotments after the conquest flow from his sons. His migration to Egypt sets up the Exodus.",
+            summary: "Younger twin who supplanted Esau, wrestled with God at Peniel, and was renamed Israel. By four women he fathered twelve sons and one daughter (Dinah).",
+            significance: "The nation Israel is named for him. The chart shows all thirteen of his children — the canonical \"Twelve Tribes of Israel\" is a later count of land-allotted tribes after the Exodus, which differs from the count of his sons in two ways: Levi received no land (priestly tribe, \"the Lord is their inheritance\"), and Joseph's portion was divided between his two sons Ephraim and Manasseh, each receiving a full tribal allotment. The arithmetic: 12 sons − Levi − Joseph + Ephraim + Manasseh = 12 tribes. Dinah, like all daughters in the patriarchal genealogies, is not counted as a tribe because tribal inheritance ran through males.",
             events: ["Bought the birthright; stole the blessing (Genesis 25, 27)", "Vision of the ladder at Bethel (Genesis 28)", "Served Laban 14 years for Leah and Rachel", "Wrestled the angel; renamed Israel (Genesis 32)", "Family migrates to Egypt during famine (Genesis 46)"],
-            refs: ["Genesis 25–50", "Hosea 12"],
+            refs: ["Genesis 25–50", "Numbers 1, 26", "Joshua 13–19", "Hosea 12"],
           }),
           M("leah", "Leah", "wife", {
             era: "Twelve Tribes", date: "c. 1830 BC", role: "First wife of Jacob; mother of six tribes and Dinah",
@@ -608,7 +608,9 @@ function expandableForId(id: string): boolean {
 }
 
 /* ============================================================
-   LAYOUT — orientation-agnostic; we compute (depth, span)
+   LAYOUT — produces (depth, span) coordinates parameterized by
+   orientation, since axis aspect ratios and the marriage-edge
+   offset differ between horizontal and vertical layouts.
 
    Father / spouse positioning rules:
    - Multi-spouse father: he sits at the midpoint of his spouses'
@@ -620,23 +622,46 @@ function expandableForId(id: string): boolean {
      own row just above the spouse.
    ============================================================ */
 
-const SPOUSE_OFFSET = 1.2; // rows between father and his single spouse
-
-function spanOfChildren(children: PersonNode[], expanded: Set<string>): number {
-  return children.reduce((sum, c) => sum + computeSpan(c, expanded), 0);
+function spouseOffsetRows(orientation: Orientation): number {
+  // Sibling-axis units differ across orientations (see axisUnits).
+  // Pick the offset so the marriage edge is roughly the same pixel
+  // length either way (~85 px horizontal, ~95 px vertical).
+  return orientation === "horizontal" ? 1.2 : 0.4;
 }
 
-function spouseBandSize(s: Spouse, expanded: Set<string>): number {
-  return Math.max(1, spanOfChildren(s.children, expanded));
+function spanOfChildren(
+  children: PersonNode[],
+  expanded: Set<string>,
+  orientation: Orientation
+): number {
+  return children.reduce((sum, c) => sum + computeSpan(c, expanded, orientation), 0);
 }
 
-function computeSpan(node: PersonNode, expanded: Set<string>): number {
+function spouseBandSize(
+  s: Spouse,
+  expanded: Set<string>,
+  orientation: Orientation
+): number {
+  return Math.max(1, spanOfChildren(s.children, expanded, orientation));
+}
+
+function computeSpan(
+  node: PersonNode,
+  expanded: Set<string>,
+  orientation: Orientation
+): number {
   if (!expanded.has(node.id)) return 1;
   const spouses = node.spouses ?? [];
-  const fromSpouses = spouses.reduce((sum, s) => sum + spouseBandSize(s, expanded), 0);
-  const fromChildren = node.children ? spanOfChildren(node.children, expanded) : 0;
+  const fromSpouses = spouses.reduce(
+    (sum, s) => sum + spouseBandSize(s, expanded, orientation),
+    0
+  );
+  const fromChildren = node.children
+    ? spanOfChildren(node.children, expanded, orientation)
+    : 0;
   // A lone spouse needs an extra row reserved for the father above her band.
-  const soloSpouseOffset = spouses.length === 1 && fromChildren === 0 ? SPOUSE_OFFSET : 0;
+  const soloSpouseOffset =
+    spouses.length === 1 && fromChildren === 0 ? spouseOffsetRows(orientation) : 0;
   return Math.max(1, fromSpouses + fromChildren + soloSpouseOffset);
 }
 
@@ -646,18 +671,17 @@ function layout(
   top: number,
   expanded: Set<string>,
   positions: LayoutPosition[],
+  orientation: Orientation,
   parentForSpouseId?: string
 ): void {
-  const span = computeSpan(node, expanded);
+  const span = computeSpan(node, expanded, orientation);
   const spouses = node.spouses ?? [];
   const directChildren = node.children ?? [];
   const isSoloSpouseCase =
     expanded.has(node.id) && spouses.length === 1 && directChildren.length === 0;
+  const offset = spouseOffsetRows(orientation);
 
-  // Father's own row position
-  const fatherSpan = isSoloSpouseCase
-    ? top + SPOUSE_OFFSET / 2
-    : top + span / 2;
+  const fatherSpan = isSoloSpouseCase ? top + offset / 2 : top + span / 2;
 
   positions.push({
     id: node.id,
@@ -670,12 +694,12 @@ function layout(
 
   if (!expanded.has(node.id)) return;
 
-  // First spouse's band starts SPOUSE_OFFSET below the father in the solo case;
+  // First spouse's band starts `offset` below the father in the solo case;
   // otherwise bands stack from `top` and the father sits at their midpoint.
-  let bandTop = isSoloSpouseCase ? top + SPOUSE_OFFSET : top;
+  let bandTop = isSoloSpouseCase ? top + offset : top;
 
   for (const sp of spouses) {
-    const bandSize = spouseBandSize(sp, expanded);
+    const bandSize = spouseBandSize(sp, expanded, orientation);
     positions.push({
       id: sp.person.id,
       node: sp.person,
@@ -687,15 +711,15 @@ function layout(
     });
     let childTop = bandTop;
     for (const c of sp.children) {
-      layout(c, depth + 1, childTop, expanded, positions);
-      childTop += computeSpan(c, expanded);
+      layout(c, depth + 1, childTop, expanded, positions, orientation);
+      childTop += computeSpan(c, expanded, orientation);
     }
     bandTop += bandSize;
   }
 
   for (const c of directChildren) {
-    layout(c, depth + 1, bandTop, expanded, positions);
-    bandTop += computeSpan(c, expanded);
+    layout(c, depth + 1, bandTop, expanded, positions, orientation);
+    bandTop += computeSpan(c, expanded, orientation);
   }
 }
 
@@ -801,10 +825,22 @@ const C = {
 
 /* ============================================================
    GEOMETRY — node sizes & axis projection
+
+   Sibling-axis spacing must exceed the maximum node extent along
+   that axis to keep siblings from overlapping:
+   - Horizontal layout: siblings stack vertically, node heights
+     38–50 px, so 70 px sibling spacing leaves a clean gap.
+   - Vertical layout: siblings stack horizontally, node widths
+     130–220 px, so we need a much larger sibling unit (240 px)
+     and a correspondingly smaller spouse offset to keep the
+     marriage edge from becoming a long horizontal sweep.
    ============================================================ */
 
-const D_UNIT = 220; // generation axis spacing
-const S_UNIT = 70;  // sibling axis spacing
+function axisUnits(orientation: Orientation): { depthUnit: number; siblingUnit: number } {
+  return orientation === "horizontal"
+    ? { depthUnit: 240, siblingUnit: 70 }
+    : { depthUnit: 200, siblingUnit: 240 };
+}
 
 function getNodeSize(node: PersonNode): { w: number; h: number } {
   if (node.type === "mother") return { w: 130, h: 38 };
@@ -814,9 +850,10 @@ function getNodeSize(node: PersonNode): { w: number; h: number } {
 }
 
 function project(p: LayoutPosition, orientation: Orientation): { x: number; y: number } {
+  const { depthUnit, siblingUnit } = axisUnits(orientation);
   return orientation === "horizontal"
-    ? { x: p.depth * D_UNIT, y: p.span * S_UNIT }
-    : { x: p.span * S_UNIT, y: p.depth * D_UNIT };
+    ? { x: p.depth * depthUnit, y: p.span * siblingUnit }
+    : { x: p.span * siblingUnit, y: p.depth * depthUnit };
 }
 
 /* ============================================================
@@ -1373,10 +1410,10 @@ export default function Genealogy() {
   const positions = useMemo(
     () => {
       const out: LayoutPosition[] = [];
-      layout(data, 0, 0, expandedIds, out);
+      layout(data, 0, 0, expandedIds, out, orientation);
       return out;
     },
-    [expandedIds]
+    [expandedIds, orientation]
   );
   const connections = useMemo(
     () => buildConnections(positions, expandedIds),
