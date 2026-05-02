@@ -1011,12 +1011,31 @@ function ConnectionPath({ conn, orientation }: { conn: Connection; orientation: 
 }
 
 /* ============================================================
+   RESPONSIVE — viewport hook
+   ============================================================ */
+
+const MOBILE_BREAKPOINT = 768;
+
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  return isMobile;
+}
+
+/* ============================================================
    DETAIL PANEL
    ============================================================ */
 
 interface DetailPanelProps {
   node: PersonNode | null;
   onClose: () => void;
+  isMobile: boolean;
 }
 
 function DetailSection({
@@ -1049,133 +1068,195 @@ function DetailSection({
   );
 }
 
-function DetailPanel({ node, onClose }: DetailPanelProps) {
+function DetailPanel({ node, onClose, isMobile }: DetailPanelProps) {
   if (!node) return null;
   const isPivot = !!node.pivot;
   const isGhost = !!node.ghost;
 
-  return (
-    <div
-      className="flex flex-col h-full overflow-hidden"
-      style={{
+  const containerStyle: React.CSSProperties = isMobile
+    ? {
+        position: "fixed",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        maxHeight: "82vh",
+        background: C.panelBg,
+        borderTop: `1px solid ${C.border}`,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        fontFamily: FONT,
+        animation: "slideUp 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)",
+        zIndex: 30,
+        boxShadow: "0 -10px 40px rgba(0,0,0,0.55)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }
+    : {
         width: 420,
         background: C.panelBg,
         borderLeft: `1px solid ${C.border}`,
         fontFamily: FONT,
         animation: "slideInRight 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)",
-      }}
-    >
-      <div style={{ padding: "24px 28px 18px", borderBottom: `1px solid ${C.border}` }}>
-        <div className="flex items-start justify-between" style={{ marginBottom: 12, gap: 12 }}>
-          <div
-            style={{
-              color: C.accent,
-              fontSize: 11,
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              fontWeight: 500,
-            }}
-          >
-            {node.era}
-            {node.date && ` · ${node.date}`}
-            {isGhost && " · skipped by Matthew"}
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              color: C.textMuted,
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              padding: 4,
-              marginRight: -4,
-              marginTop: -4,
-            }}
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <h2
+      };
+
+  const headerPad = isMobile ? "16px 18px 14px" : "24px 28px 18px";
+  const bodyPad = isMobile ? "16px 18px 28px" : "22px 28px 32px";
+  const titleSize = isMobile ? 24 : 30;
+
+  return (
+    <>
+      {isMobile && (
+        <div
+          onClick={onClose}
           style={{
-            color: C.text,
-            fontSize: 30,
-            fontWeight: 450,
-            letterSpacing: "-0.02em",
-            lineHeight: 1.06,
-            marginBottom: 6,
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            zIndex: 25,
+            animation: "fadeIn 0.25s ease-out",
           }}
-        >
-          {node.name}
-        </h2>
-        {node.role && (
+        />
+      )}
+      <div
+        className={`flex flex-col overflow-hidden${isMobile ? "" : " h-full"}`}
+        style={containerStyle}
+        role="dialog"
+        aria-label={`Details for ${node.name}`}
+      >
+        {isMobile && (
           <div
             style={{
-              color: isPivot ? C.accent : C.textMuted,
-              fontSize: 14,
-              fontWeight: 450,
-              fontStyle: node.type === "mother" ? "italic" : "normal",
+              display: "flex",
+              justifyContent: "center",
+              padding: "8px 0 0",
             }}
+            aria-hidden
           >
-            {node.role}
+            <span
+              style={{
+                width: 36,
+                height: 4,
+                borderRadius: 2,
+                background: C.border,
+              }}
+            />
           </div>
         )}
-      </div>
-
-      <div className="flex-1 overflow-y-auto" style={{ padding: "22px 28px 32px" }}>
-        {node.summary && (
-          <p style={{ color: C.text, fontSize: 15, lineHeight: 1.55, marginBottom: 24 }}>
-            {node.summary}
-          </p>
-        )}
-
-        {node.significance && (
-          <DetailSection icon={<Sparkles size={13} style={{ color: C.accent }} />} label="Why this matters">
-            <p style={{ color: C.text, fontSize: 14, lineHeight: 1.6 }}>{node.significance}</p>
-          </DetailSection>
-        )}
-
-        {node.events && node.events.length > 0 && (
-          <DetailSection icon={<Calendar size={13} style={{ color: C.accent }} />} label="Key events">
-            <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-              {node.events.map((e, i) => (
-                <li
-                  key={i}
-                  style={{
-                    color: C.text,
-                    fontSize: 13.5,
-                    lineHeight: 1.55,
-                    paddingLeft: 16,
-                    position: "relative",
-                    marginBottom: 8,
-                  }}
-                >
-                  <span
-                    style={{
-                      position: "absolute",
-                      left: 0,
-                      top: 9,
-                      width: 6,
-                      height: 1,
-                      background: C.accentDeep,
-                    }}
-                  />
-                  {e}
-                </li>
-              ))}
-            </ul>
-          </DetailSection>
-        )}
-
-        {node.refs && node.refs.length > 0 && (
-          <DetailSection icon={<BookOpen size={13} style={{ color: C.accent }} />} label="Scripture">
-            <div style={{ color: C.textMuted, fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>
-              {node.refs.join(" · ")}
+        <div style={{ padding: headerPad, borderBottom: `1px solid ${C.border}` }}>
+          <div className="flex items-start justify-between" style={{ marginBottom: 12, gap: 12 }}>
+            <div
+              style={{
+                color: C.accent,
+                fontSize: 11,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                fontWeight: 500,
+              }}
+            >
+              {node.era}
+              {node.date && ` · ${node.date}`}
+              {isGhost && " · skipped by Matthew"}
             </div>
-          </DetailSection>
-        )}
+            <button
+              onClick={onClose}
+              style={{
+                color: C.textMuted,
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: 8,
+                marginRight: -8,
+                marginTop: -8,
+                touchAction: "manipulation",
+              }}
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <h2
+            style={{
+              color: C.text,
+              fontSize: titleSize,
+              fontWeight: 450,
+              letterSpacing: "-0.02em",
+              lineHeight: 1.06,
+              marginBottom: 6,
+            }}
+          >
+            {node.name}
+          </h2>
+          {node.role && (
+            <div
+              style={{
+                color: isPivot ? C.accent : C.textMuted,
+                fontSize: 14,
+                fontWeight: 450,
+                fontStyle: node.type === "mother" ? "italic" : "normal",
+              }}
+            >
+              {node.role}
+            </div>
+          )}
+        </div>
+
+        <div
+          className="flex-1 overflow-y-auto"
+          style={{ padding: bodyPad, WebkitOverflowScrolling: "touch", overscrollBehavior: "contain" }}
+        >
+          {node.summary && (
+            <p style={{ color: C.text, fontSize: 15, lineHeight: 1.55, marginBottom: 24 }}>
+              {node.summary}
+            </p>
+          )}
+
+          {node.significance && (
+            <DetailSection icon={<Sparkles size={13} style={{ color: C.accent }} />} label="Why this matters">
+              <p style={{ color: C.text, fontSize: 14, lineHeight: 1.6 }}>{node.significance}</p>
+            </DetailSection>
+          )}
+
+          {node.events && node.events.length > 0 && (
+            <DetailSection icon={<Calendar size={13} style={{ color: C.accent }} />} label="Key events">
+              <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+                {node.events.map((e, i) => (
+                  <li
+                    key={i}
+                    style={{
+                      color: C.text,
+                      fontSize: 13.5,
+                      lineHeight: 1.55,
+                      paddingLeft: 16,
+                      position: "relative",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <span
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        top: 9,
+                        width: 6,
+                        height: 1,
+                        background: C.accentDeep,
+                      }}
+                    />
+                    {e}
+                  </li>
+                ))}
+              </ul>
+            </DetailSection>
+          )}
+
+          {node.refs && node.refs.length > 0 && (
+            <DetailSection icon={<BookOpen size={13} style={{ color: C.accent }} />} label="Scripture">
+              <div style={{ color: C.textMuted, fontSize: 13, fontStyle: "italic", lineHeight: 1.6 }}>
+                {node.refs.join(" · ")}
+              </div>
+            </DetailSection>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -1230,6 +1311,7 @@ export default function Genealogy() {
   const gRef = useRef<SVGGElement | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     try {
@@ -1304,11 +1386,27 @@ export default function Genealogy() {
     [positions, orientation]
   );
 
-  // Initial centering and re-center on orientation flip
+  // Initial centering and re-center on orientation flip / mobile-breakpoint change
   useEffect(() => {
     recenter(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orientation]);
+  }, [orientation, isMobile]);
+
+  // Re-fit when the viewport itself resizes (rotation, browser resize, soft-keyboard close)
+  useEffect(() => {
+    let raf = 0;
+    const onResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => recenter(false));
+    };
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, [recenter]);
 
   const handleNodeClick = (node: PersonNode): void => {
     if (expandableForId(node.id)) {
@@ -1359,16 +1457,17 @@ export default function Genealogy() {
     background: "transparent",
     border: `1px solid ${C.border}`,
     borderRadius: 6,
-    padding: "7px 12px",
-    fontSize: 12,
+    padding: isMobile ? "8px 10px" : "7px 12px",
+    fontSize: isMobile ? 11 : 12,
     fontFamily: FONT,
     cursor: "pointer",
     letterSpacing: "0.02em",
+    touchAction: "manipulation",
   };
 
   const iconBtnStyle: React.CSSProperties = {
     ...btnStyle,
-    padding: "7px 9px",
+    padding: isMobile ? "8px 9px" : "7px 9px",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -1385,7 +1484,7 @@ export default function Genealogy() {
     <div
       className="flex w-full"
       style={{
-        height: "100vh",
+        height: "100dvh",
         background: C.bg,
         fontFamily: FONT,
         overflow: "hidden",
@@ -1394,78 +1493,97 @@ export default function Genealogy() {
       <style>{`
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideInRight { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(28px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .node-fade-in { animation: fadeIn 0.35s ease-out; }
         .connection-fade-in { animation: fadeIn 0.5s ease-out; }
         .tool-btn { transition: all 0.15s ease-out; }
         .tool-btn:hover { background: ${C.surfaceHover} !important; color: ${C.text} !important; border-color: ${C.borderPivot} !important; }
         .tool-btn:active { transform: scale(0.96); }
+        .gen-svg { touch-action: none; -webkit-user-select: none; user-select: none; }
       `}</style>
 
       <div className="flex-1 flex flex-col" style={{ minWidth: 0, position: "relative" }}>
         <header
           className="flex items-center justify-between"
           style={{
-            padding: "16px 24px",
+            padding: isMobile ? "10px 14px" : "16px 24px",
             borderBottom: `1px solid ${C.border}`,
             background: C.bg,
             zIndex: 10,
+            gap: 8,
+            paddingTop: isMobile ? "calc(10px + env(safe-area-inset-top))" : "16px",
           }}
         >
-          <div>
+          <div style={{ minWidth: 0, flex: "0 1 auto" }}>
             <h1
               style={{
                 color: C.text,
-                fontSize: 20,
+                fontSize: isMobile ? 16 : 20,
                 fontWeight: 500,
                 letterSpacing: "-0.018em",
                 lineHeight: 1.1,
+                whiteSpace: "nowrap",
               }}
             >
               Abraham to Jesus
             </h1>
-            <div style={{ color: C.textFaint, fontSize: 11, letterSpacing: "0.06em", marginTop: 3 }}>
-              click a node to expand · scroll to zoom · drag to pan
-            </div>
+            {!isMobile && (
+              <div style={{ color: C.textFaint, fontSize: 11, letterSpacing: "0.06em", marginTop: 3 }}>
+                click a node to expand · scroll to zoom · drag to pan
+              </div>
+            )}
           </div>
 
-          <div className="flex items-center" style={{ gap: 8 }}>
-            <button onClick={toggleOrientation} className="tool-btn" style={orientationBtnStyle} title="Toggle layout orientation">
+          <div className="flex items-center" style={{ gap: isMobile ? 4 : 8, flexShrink: 0 }}>
+            <button onClick={toggleOrientation} className="tool-btn" style={orientationBtnStyle} title="Toggle layout orientation" aria-label="Toggle layout orientation">
               <OrientationIcon orientation={orientation} />
-              <span>{orientation === "horizontal" ? "Horizontal" : "Vertical"}</span>
+              {!isMobile && <span>{orientation === "horizontal" ? "Horizontal" : "Vertical"}</span>}
             </button>
-            <div style={{ width: 1, height: 24, background: C.border, margin: "0 4px" }} />
-            <button onClick={expandAll} className="tool-btn" style={btnStyle}>
-              Expand all
+            {!isMobile && <div style={{ width: 1, height: 24, background: C.border, margin: "0 4px" }} />}
+            <button onClick={expandAll} className="tool-btn" style={btnStyle} title="Expand all">
+              {isMobile ? "All" : "Expand all"}
             </button>
-            <button onClick={reset} className="tool-btn" style={btnStyle}>
+            <button onClick={reset} className="tool-btn" style={btnStyle} title="Reset">
               Reset
             </button>
-            <div style={{ width: 1, height: 24, background: C.border, margin: "0 4px" }} />
-            <button onClick={() => zoomBy(0.7)} className="tool-btn" style={iconBtnStyle} title="Zoom out">
-              <ZoomOut size={15} />
-            </button>
-            <button onClick={() => zoomBy(1.4)} className="tool-btn" style={iconBtnStyle} title="Zoom in">
-              <ZoomIn size={15} />
-            </button>
-            <button onClick={() => recenter(true)} className="tool-btn" style={iconBtnStyle} title="Fit to screen">
+            {!isMobile && <div style={{ width: 1, height: 24, background: C.border, margin: "0 4px" }} />}
+            {!isMobile && (
+              <button onClick={() => zoomBy(0.7)} className="tool-btn" style={iconBtnStyle} title="Zoom out" aria-label="Zoom out">
+                <ZoomOut size={15} />
+              </button>
+            )}
+            {!isMobile && (
+              <button onClick={() => zoomBy(1.4)} className="tool-btn" style={iconBtnStyle} title="Zoom in" aria-label="Zoom in">
+                <ZoomIn size={15} />
+              </button>
+            )}
+            <button onClick={() => recenter(true)} className="tool-btn" style={iconBtnStyle} title="Fit to screen" aria-label="Fit to screen">
               <Maximize2 size={14} />
             </button>
-            <div
-              style={{
-                color: C.textFaint,
-                fontSize: 11,
-                fontVariantNumeric: "tabular-nums",
-                minWidth: 36,
-                textAlign: "right",
-              }}
-            >
-              {Math.round(zoomLevel * 100)}%
-            </div>
+            {!isMobile && (
+              <div
+                style={{
+                  color: C.textFaint,
+                  fontSize: 11,
+                  fontVariantNumeric: "tabular-nums",
+                  minWidth: 36,
+                  textAlign: "right",
+                }}
+              >
+                {Math.round(zoomLevel * 100)}%
+              </div>
+            )}
           </div>
         </header>
 
         <div className="flex-1" style={{ position: "relative", overflow: "hidden" }}>
-          <svg ref={svgRef} width="100%" height="100%" style={{ display: "block", cursor: "grab" }}>
+          <svg
+            ref={svgRef}
+            width="100%"
+            height="100%"
+            className="gen-svg"
+            style={{ display: "block", cursor: "grab" }}
+          >
             <g ref={gRef}>
               {connections.map((c) => (
                 <ConnectionPath key={`${c.kind}-${c.fromId}-${c.toId}`} conn={c} orientation={orientation} />
@@ -1484,97 +1602,132 @@ export default function Genealogy() {
             </g>
           </svg>
 
+          {isMobile && (
+            <div
+              style={{
+                position: "absolute",
+                top: 8,
+                right: 8,
+                color: C.textFaint,
+                fontSize: 10,
+                fontVariantNumeric: "tabular-nums",
+                padding: "3px 8px",
+                background: "rgba(15,13,10,0.7)",
+                border: `1px solid ${C.border}`,
+                borderRadius: 999,
+                pointerEvents: "none",
+              }}
+            >
+              {Math.round(zoomLevel * 100)}%
+            </div>
+          )}
+
           {expandedIds.size === 0 && !selectedId && (
             <div
               style={{
                 position: "absolute",
-                bottom: 32,
+                bottom: isMobile ? 16 : 32,
                 left: "50%",
                 transform: "translateX(-50%)",
                 color: C.textFaint,
-                fontSize: 12,
+                fontSize: isMobile ? 11 : 12,
                 letterSpacing: "0.04em",
-                padding: "10px 18px",
+                padding: isMobile ? "8px 14px" : "10px 18px",
                 background: C.surface,
                 border: `1px solid ${C.border}`,
                 borderRadius: 8,
                 pointerEvents: "none",
                 animation: "fadeIn 0.6s ease-out",
+                whiteSpace: isMobile ? "nowrap" : "normal",
+                maxWidth: "calc(100% - 24px)",
+                textAlign: "center",
               }}
             >
-              Click <span style={{ color: C.accent }}>Abraham</span> to begin · or{" "}
-              <span style={{ color: C.accent }}>Expand all</span> to see the full lineage
+              {isMobile ? (
+                <>
+                  Tap <span style={{ color: C.accent }}>Abraham</span> · pinch to zoom
+                </>
+              ) : (
+                <>
+                  Click <span style={{ color: C.accent }}>Abraham</span> to begin · or{" "}
+                  <span style={{ color: C.accent }}>Expand all</span> to see the full lineage
+                </>
+              )}
             </div>
           )}
         </div>
 
-        <footer
-          className="flex items-center justify-between"
-          style={{
-            padding: "10px 24px",
-            borderTop: `1px solid ${C.border}`,
-            background: C.bg,
-            zIndex: 10,
-            flexWrap: "wrap",
-            gap: 12,
-          }}
-        >
-          <div className="flex items-center" style={{ gap: 18, flexWrap: "wrap" }}>
-            <div className="flex items-center" style={{ gap: 7 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.accent }} />
-              <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>pivot moment</span>
+        {!isMobile && (
+          <footer
+            className="flex items-center justify-between"
+            style={{
+              padding: "10px 24px",
+              borderTop: `1px solid ${C.border}`,
+              background: C.bg,
+              zIndex: 10,
+              flexWrap: "wrap",
+              gap: 12,
+            }}
+          >
+            <div className="flex items-center" style={{ gap: 18, flexWrap: "wrap" }}>
+              <div className="flex items-center" style={{ gap: 7 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.accent }} />
+                <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>pivot moment</span>
+              </div>
+              <div className="flex items-center" style={{ gap: 7 }}>
+                <span
+                  style={{
+                    width: 22,
+                    height: 12,
+                    borderRadius: 6,
+                    background: C.surfaceMother,
+                    border: `1px solid ${C.border}`,
+                  }}
+                />
+                <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>matriarch</span>
+              </div>
+              <div className="flex items-center" style={{ gap: 7 }}>
+                <svg width="22" height="6">
+                  <line x1="0" y1="3" x2="22" y2="3" stroke={C.lineMarriage} strokeDasharray="4 3" strokeWidth="1.2" />
+                </svg>
+                <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>marriage</span>
+              </div>
+              <div className="flex items-center" style={{ gap: 7 }}>
+                <svg width="22" height="6">
+                  <line x1="0" y1="3" x2="22" y2="3" stroke={C.lineHandmaid} strokeDasharray="2 3" strokeWidth="1.2" />
+                </svg>
+                <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>handmaid / surrogate</span>
+              </div>
+              <div className="flex items-center" style={{ gap: 7 }}>
+                <span
+                  style={{
+                    width: 22,
+                    height: 12,
+                    borderRadius: 6,
+                    background: C.surfaceGhost,
+                    border: `1px dashed ${C.borderGhost}`,
+                    opacity: 0.7,
+                  }}
+                />
+                <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>skipped by Matthew</span>
+              </div>
+              <div className="flex items-center" style={{ gap: 7 }}>
+                <svg width="22" height="6">
+                  <line x1="0" y1="3" x2="22" y2="3" stroke={C.lineCross} strokeDasharray="2 4" strokeWidth="1.2" />
+                </svg>
+                <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>Lukan cross-link</span>
+              </div>
             </div>
-            <div className="flex items-center" style={{ gap: 7 }}>
-              <span
-                style={{
-                  width: 22,
-                  height: 12,
-                  borderRadius: 6,
-                  background: C.surfaceMother,
-                  border: `1px solid ${C.border}`,
-                }}
-              />
-              <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>matriarch</span>
+            <div style={{ color: C.textFaint, fontSize: 11, letterSpacing: "0.04em" }}>
+              sources: Genesis · Ruth · 1–2 Kings · 1–2 Chronicles · Matthew 1 · Luke 3
             </div>
-            <div className="flex items-center" style={{ gap: 7 }}>
-              <svg width="22" height="6">
-                <line x1="0" y1="3" x2="22" y2="3" stroke={C.lineMarriage} strokeDasharray="4 3" strokeWidth="1.2" />
-              </svg>
-              <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>marriage</span>
-            </div>
-            <div className="flex items-center" style={{ gap: 7 }}>
-              <svg width="22" height="6">
-                <line x1="0" y1="3" x2="22" y2="3" stroke={C.lineHandmaid} strokeDasharray="2 3" strokeWidth="1.2" />
-              </svg>
-              <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>handmaid / surrogate</span>
-            </div>
-            <div className="flex items-center" style={{ gap: 7 }}>
-              <span
-                style={{
-                  width: 22,
-                  height: 12,
-                  borderRadius: 6,
-                  background: C.surfaceGhost,
-                  border: `1px dashed ${C.borderGhost}`,
-                  opacity: 0.7,
-                }}
-              />
-              <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>skipped by Matthew</span>
-            </div>
-            <div className="flex items-center" style={{ gap: 7 }}>
-              <svg width="22" height="6">
-                <line x1="0" y1="3" x2="22" y2="3" stroke={C.lineCross} strokeDasharray="2 4" strokeWidth="1.2" />
-              </svg>
-              <span style={{ color: C.textMuted, fontSize: 11, letterSpacing: "0.04em" }}>Lukan cross-link</span>
-            </div>
-          </div>
-          <div style={{ color: C.textFaint, fontSize: 11, letterSpacing: "0.04em" }}>
-            sources: Genesis · Ruth · 1–2 Kings · 1–2 Chronicles · Matthew 1 · Luke 3
-          </div>
-        </footer>
+          </footer>
+        )}
       </div>
 
-      {selectedNode && <DetailPanel node={selectedNode} onClose={() => setSelectedId(null)} />}
+      {selectedNode && (
+        <DetailPanel node={selectedNode} onClose={() => setSelectedId(null)} isMobile={isMobile} />
+      )}
     </div>
   );
 }
