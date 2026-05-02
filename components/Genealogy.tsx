@@ -609,21 +609,35 @@ function expandableForId(id: string): boolean {
 
 /* ============================================================
    LAYOUT — orientation-agnostic; we compute (depth, span)
+
+   Father / spouse positioning rules:
+   - Multi-spouse father: he sits at the midpoint of his spouses'
+     combined band, each spouse at her band center. The asymmetric
+     band sizes naturally keep them off the same row.
+   - Single-spouse father: he and the spouse would otherwise both
+     center on the same band, producing visual overlap. We reserve
+     SPOUSE_OFFSET extra rows above the band so the father has his
+     own row just above the spouse.
    ============================================================ */
+
+const SPOUSE_OFFSET = 1.2; // rows between father and his single spouse
 
 function spanOfChildren(children: PersonNode[], expanded: Set<string>): number {
   return children.reduce((sum, c) => sum + computeSpan(c, expanded), 0);
 }
 
+function spouseBandSize(s: Spouse, expanded: Set<string>): number {
+  return Math.max(1, spanOfChildren(s.children, expanded));
+}
+
 function computeSpan(node: PersonNode, expanded: Set<string>): number {
   if (!expanded.has(node.id)) return 1;
-  const fromSpouses =
-    node.spouses?.reduce(
-      (sum, s) => sum + Math.max(1, spanOfChildren(s.children, expanded)),
-      0
-    ) ?? 0;
+  const spouses = node.spouses ?? [];
+  const fromSpouses = spouses.reduce((sum, s) => sum + spouseBandSize(s, expanded), 0);
   const fromChildren = node.children ? spanOfChildren(node.children, expanded) : 0;
-  return Math.max(1, fromSpouses + fromChildren);
+  // A lone spouse needs an extra row reserved for the father above her band.
+  const soloSpouseOffset = spouses.length === 1 && fromChildren === 0 ? SPOUSE_OFFSET : 0;
+  return Math.max(1, fromSpouses + fromChildren + soloSpouseOffset);
 }
 
 function layout(
@@ -635,22 +649,33 @@ function layout(
   parentForSpouseId?: string
 ): void {
   const span = computeSpan(node, expanded);
+  const spouses = node.spouses ?? [];
+  const directChildren = node.children ?? [];
+  const isSoloSpouseCase =
+    expanded.has(node.id) && spouses.length === 1 && directChildren.length === 0;
+
+  // Father's own row position
+  const fatherSpan = isSoloSpouseCase
+    ? top + SPOUSE_OFFSET / 2
+    : top + span / 2;
+
   positions.push({
     id: node.id,
     node,
     depth,
-    span: top + span / 2,
+    span: fatherSpan,
     isSpouse: !!parentForSpouseId,
     parentId: parentForSpouseId,
   });
 
   if (!expanded.has(node.id)) return;
 
-  let bandTop = top;
+  // First spouse's band starts SPOUSE_OFFSET below the father in the solo case;
+  // otherwise bands stack from `top` and the father sits at their midpoint.
+  let bandTop = isSoloSpouseCase ? top + SPOUSE_OFFSET : top;
 
-  for (const sp of node.spouses ?? []) {
-    const childSpan = spanOfChildren(sp.children, expanded);
-    const bandSize = Math.max(1, childSpan);
+  for (const sp of spouses) {
+    const bandSize = spouseBandSize(sp, expanded);
     positions.push({
       id: sp.person.id,
       node: sp.person,
@@ -668,7 +693,7 @@ function layout(
     bandTop += bandSize;
   }
 
-  for (const c of node.children ?? []) {
+  for (const c of directChildren) {
     layout(c, depth + 1, bandTop, expanded, positions);
     bandTop += computeSpan(c, expanded);
   }
